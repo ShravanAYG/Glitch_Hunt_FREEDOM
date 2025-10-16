@@ -1,12 +1,3 @@
-
-
-
-
-
-
-
-
-
 import pygame
 import random
 import imageio
@@ -14,9 +5,9 @@ import imageio
 pygame.init()
 
 # Screen
-WIDTH, HEIGHT = 1280, 720
+WIDTH, HEIGHT = 800, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Laser Shooter with Startup")
+pygame.display.set_caption("Laser Shooter with Startup + Troll Event")
 
 # Load images
 player_img = pygame.image.load("player.png").convert_alpha()
@@ -26,6 +17,7 @@ bg_img = pygame.image.load("background.png").convert_alpha()
 laser_img = pygame.image.load("laser.png").convert_alpha()
 flag_img = pygame.image.load("flag.jpg").convert_alpha()  # startup background
 eagle_img = pygame.image.load("eagle.jpg").convert_alpha()
+troll_img = pygame.image.load("troll.png").convert_alpha()  # funny troll image
 
 # Scale images
 player_img = pygame.transform.scale(player_img, (171, 341))
@@ -34,7 +26,8 @@ friend_img = pygame.transform.scale(friend_img, (100, 43))
 bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
 laser_img = pygame.transform.scale(laser_img, (50, 150))
 flag_img = pygame.transform.scale(flag_img, (WIDTH, HEIGHT))
-eagle_img = pygame.transform.scale(eagle_img, (180, 130))  # bigger eagle
+eagle_img = pygame.transform.scale(eagle_img, (180, 130))
+troll_img = pygame.transform.scale(troll_img, (200, 200))
 
 # Load ben.gif frames
 try:
@@ -43,6 +36,13 @@ try:
 except Exception as e:
     ben_frames = None
     print(f"Could not load ben.gif: {e}")
+
+# Load laugh sound
+try:
+    laugh_sound = pygame.mixer.Sound("laugh.mp3")
+except:
+    laugh_sound = None
+    print("laugh.mp3 not found — sound disabled")
 
 # Clock
 clock = pygame.time.Clock()
@@ -63,6 +63,7 @@ spawn_timer = 0
 
 # Score
 score = 0
+previous_score = 0  # Track for troll trigger
 
 # Enemy settings
 ENEMY_MAX_HEALTH = 9
@@ -77,9 +78,14 @@ ben_scale = 0.1
 ben_started = False
 
 # Startup timing
-enlarge_duration = 48  # reduced from 72 (1.2 seconds shorter)
+enlarge_duration = 48
 stay_duration = 180
 total_duration = enlarge_duration + stay_duration
+
+# Troll popup variables
+troll_active = False
+troll_timer = 0
+TROLL_DURATION = 120  # 2 seconds at 60 FPS
 
 # -----------------------------
 # STARTUP SCREEN FUNCTION
@@ -95,10 +101,10 @@ def draw_startup_screen():
     if eagle_img:
         screen.blit(eagle_img, (int(eagle_x), 150))
 
-    # Draw "CAWWWWW" text following from behind
+    # Draw "CAWWWWW" trailing text
     font_large = pygame.font.SysFont(None, 72, bold=True)
     caw_text = font_large.render("CAWWWWW", True, (255, 255, 255))
-    screen.blit(caw_text, (int(eagle_x - 200), 170))  # text trails behind eagle
+    screen.blit(caw_text, (int(eagle_x - 200), 170))
 
     # When eagle passes right edge, start ben animation
     if eagle_x > WIDTH and not ben_started:
@@ -124,7 +130,6 @@ def draw_startup_screen():
         ben_y = 100
         screen.blit(ben_scaled, (ben_x, ben_y))
 
-        # Draw text when ben fully enlarged
         if ben_timer > enlarge_duration:
             font_hello = pygame.font.SysFont(None, 48)
             hello_text = font_hello.render("Hello There", True, (255, 255, 255))
@@ -134,6 +139,22 @@ def draw_startup_screen():
         if ben_timer > total_duration:
             startup_active = False
 
+    pygame.display.flip()
+
+# -----------------------------
+# TROLL POPUP FUNCTION
+# -----------------------------
+def draw_troll_popup():
+    """Show troll face + laughing text"""
+    screen.blit(bg_img, (0, 0))
+    troll_x = WIDTH // 2 - troll_img.get_width() // 2
+    troll_y = HEIGHT // 2 - troll_img.get_height() // 2
+    screen.blit(troll_img, (troll_x, troll_y))
+
+    font = pygame.font.SysFont(None, 72, bold=True)
+    text = font.render("HAHAHA!", True, (255, 0, 0))
+    text_x = WIDTH // 2 - text.get_width() // 2
+    screen.blit(text, (text_x, troll_y + troll_img.get_height() + 20))
     pygame.display.flip()
 
 # -----------------------------
@@ -155,9 +176,18 @@ while running:
             if event.key == pygame.K_SPACE:
                 laser_on = False
 
-    # Run startup screen
+    # Startup screen
     if startup_active:
         draw_startup_screen()
+        continue
+
+    # Troll popup
+    if troll_active:
+        draw_troll_popup()
+        troll_timer += 1
+        if troll_timer > TROLL_DURATION:
+            troll_timer = 0
+            troll_active = False
         continue
 
     # -----------------------------
@@ -189,10 +219,8 @@ while running:
         laser_x = player_x + player_width // 2 - laser_img.get_width() // 2 + 100
         for y in range(player_y, -laser_img.get_height(), -laser_img.get_height()):
             screen.blit(laser_img, (laser_x, y))
-
         laser_rect = pygame.Rect(laser_x, 0, laser_img.get_width(), player_y + player_height)
 
-        # Hit enemies
         for e in enemies[:]:
             enemy_rect = pygame.Rect(e[0], e[1], enemy_img.get_width(), enemy_img.get_height())
             if laser_rect.colliderect(enemy_rect):
@@ -201,14 +229,13 @@ while running:
                     enemies.remove(e)
                     score += 1
 
-        # Hit friends
         for f in friends[:]:
             friend_rect = pygame.Rect(f[0], f[1], friend_img.get_width(), friend_img.get_height())
             if laser_rect.colliderect(friend_rect):
                 friends.remove(f)
                 score -= 1
 
-    # Penalize missed enemies
+    # Penalize escaped enemies
     for e in enemies[:]:
         if e[0] > WIDTH:
             enemies.remove(e)
@@ -217,31 +244,39 @@ while running:
     # Remove off-screen friends
     friends = [f for f in friends if f[0] < WIDTH]
 
-    # Draw background
+    # -----------------------------
+    # TROLL TRIGGER CHECK
+    # -----------------------------
+    if previous_score == 1 and score == 0 and not troll_active:
+        troll_active = True
+        troll_timer = 0
+        if laugh_sound:
+            laugh_sound.play()
+
+    previous_score = score
+
+    # -----------------------------
+    # DRAW EVERYTHING
+    # -----------------------------
     screen.blit(bg_img, (0, 0))
 
-    # Draw laser again (for persistence)
     if laser_on:
         for y in range(player_y, -laser_img.get_height(), -laser_img.get_height()):
             screen.blit(laser_img, (player_x - laser_img.get_width() // 2 + 73, y))
 
-    # Draw player
     screen.blit(player_img, (player_x, player_y))
 
-    # Draw enemies + health bars
     for e in enemies:
         screen.blit(enemy_img, (e[0], e[1]))
         bar_width = enemy_img.get_width()
         bar_height = 5
         health_ratio = e[2] / ENEMY_MAX_HEALTH
-        pygame.draw.rect(screen, (255, 0, 0), (e[0], e[1] - 10, bar_width, bar_height))
-        pygame.draw.rect(screen, (0, 255, 0), (e[0], e[1] - 10, bar_width * health_ratio, bar_height))
+        pygame.draw.rect(screen, (255, 0, 0), (e[0], e[1]-10, bar_width, bar_height))
+        pygame.draw.rect(screen, (0, 255, 0), (e[0], e[1]-10, bar_width*health_ratio, bar_height))
 
-    # Draw friends
     for f in friends:
         screen.blit(friend_img, (f[0], f[1]))
 
-    # Draw score
     font = pygame.font.SysFont(None, 36)
     score_text = font.render(f"Score: {score}", True, (255, 255, 255))
     screen.blit(score_text, (10, 10))
@@ -249,13 +284,4 @@ while running:
     pygame.display.flip()
 
 pygame.quit()
-
-
-
-
-
-
-
-
-
 

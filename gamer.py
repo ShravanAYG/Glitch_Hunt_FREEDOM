@@ -5,7 +5,7 @@ import imageio
 pygame.init()
 
 # Screen
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1280, 720
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Laser Shooter with Startup + Troll Event")
 

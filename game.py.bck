@@ -1,0 +1,127 @@
+import pygame
+import random
+
+# Initialize Pygame
+pygame.init()
+
+# Screen
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Laser Shooter with Visible Tiled Laser")
+
+# Load images
+player_img = pygame.image.load("player.png").convert_alpha()
+enemy_img = pygame.image.load("enemy.png").convert_alpha()
+friend_img = pygame.image.load("friend.png").convert_alpha()
+bg_img = pygame.image.load("background.png").convert_alpha()
+laser_img = pygame.image.load("laser.png").convert_alpha()  # vertical laser tile
+
+# Scale images if needed
+player_img = pygame.transform.scale(player_img, (171, 341))
+enemy_img = pygame.transform.scale(enemy_img, (100, 50))
+friend_img = pygame.transform.scale(friend_img, (100, 43))
+bg_img = pygame.transform.scale(bg_img, (WIDTH, HEIGHT))
+laser_img = pygame.transform.scale(laser_img, (130, 150))  # laser tile width x height
+
+# Clock
+clock = pygame.time.Clock()
+FPS = 60
+
+# Player
+player_width, player_height = player_img.get_size()
+player_x, player_y = WIDTH // 2 - player_width // 2, HEIGHT - 250
+player_speed = 7
+
+# Laser
+laser_on = False
+
+# Enemies & friends
+enemies = []
+friends = []
+spawn_timer = 0
+
+# Score
+score = 0
+
+# Game loop
+running = True
+while running:
+    clock.tick(FPS)
+
+    # Event handling
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                laser_on = True
+        if event.type == pygame.KEYUP:
+            if event.key == pygame.K_SPACE:
+                laser_on = False
+
+    # Player movement
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT] and player_x > 0:
+        player_x -= player_speed
+    if keys[pygame.K_RIGHT] and player_x < WIDTH - player_width:
+        player_x += player_speed
+
+    # Spawn enemies/friends
+    spawn_timer += 1
+    if spawn_timer > 50:
+        spawn_timer = 0
+        if random.random() < 0.7:
+            enemies.append([0, random.randint(50, HEIGHT - 150)])
+        else:
+            friends.append([0, random.randint(50, HEIGHT - 150)])
+
+    # Move enemies/friends
+    for e in enemies:
+        e[0] += 4
+    for f in friends:
+        f[0] += 3
+
+    # Remove off-screen enemies/friends
+    enemies = [e for e in enemies if e[0] < WIDTH]
+    friends = [f for f in friends if f[0] < WIDTH]
+
+    # Draw background
+    screen.blit(bg_img, (0, 0))
+
+    # Draw laser tiles
+    if laser_on:
+        laser_x = player_x + player_width // 2 - laser_img.get_width() // 2
+        for y in range(player_y, -laser_img.get_height(), -laser_img.get_height()):
+            screen.blit(laser_img, (laser_x, y))
+        # Laser collision rect for detection
+        laser_rect = pygame.Rect(laser_x, 0, laser_img.get_width(), player_y + player_height)
+        for e in enemies[:]:
+            enemy_rect = pygame.Rect(e[0], e[1], enemy_img.get_width(), enemy_img.get_height())
+            if laser_rect.colliderect(enemy_rect):
+                enemies.remove(e)
+                score += 1
+        for f in friends[:]:
+            friend_rect = pygame.Rect(f[0], f[1], friend_img.get_width(), friend_img.get_height())
+            if laser_rect.colliderect(friend_rect):
+                friends.remove(f)
+                score += 1
+
+    # Draw player
+    screen.blit(player_img, (player_x, player_y))
+
+    # Draw enemies & friends
+    for e in enemies:
+        screen.blit(enemy_img, (e[0], e[1]))
+    for f in friends:
+        screen.blit(friend_img, (f[0], f[1]))
+
+    # Draw score
+    font = pygame.font.SysFont(None, 36)
+    score_text = font.render(f"Score: {score}", True, (255, 255, 255))
+    screen.blit(score_text, (10, 10))
+
+    pygame.display.flip()
+
+pygame.quit()
+
+
